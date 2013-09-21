@@ -33,27 +33,34 @@ module Grape
     end
 
     def initialize(settings, options = {}, &block)
+      require_option(options, :path)
+      require_option(options, :method)
+
       @settings = settings
+      @options = options
+
+      @options[:path] = Array(options[:path])
+      @options[:path] << '/' if options[:path].empty?
+
+      @options[:method] = Array(options[:method])
+      @options[:route_options] ||= {}
+
       if block_given?
-        method_name = [
-          options[:method],
-          Namespace.joined_space(settings),
-          settings.gather(:mount_path).join("/"),
-          Array(options[:path]).join("/")
-        ].join(" ")
         @source = block
         @block = self.class.generate_api_method(method_name, &block)
       end
-      @options = options
+    end
 
-      raise Grape::Exceptions::MissingOption.new(:path) unless options.key?(:path)
-      options[:path] = Array(options[:path])
-      options[:path] = ['/'] if options[:path].empty?
+    def require_option(options, key)
+      options.has_key?(key) or raise Grape::Exceptions::MissingOption.new(key)
+    end
 
-      raise Grape::Exceptions::MissingOption.new(:method) unless options.key?(:method)
-      options[:method] = Array(options[:method])
-
-      options[:route_options] ||= {}
+    def method_name
+      [ options[:method],
+        Namespace.joined_space(settings),
+        settings.gather(:mount_path).join('/'),
+        options[:path].join('/')
+      ].join(" ")
     end
 
     def routes
@@ -120,24 +127,7 @@ module Grape
     end
 
     def prepare_path(path)
-      parts = []
-      parts << settings[:mount_path].to_s.split("/") if settings[:mount_path]
-      parts << settings[:root_prefix].to_s.split("/") if settings[:root_prefix]
-
-      uses_path_versioning = settings[:version] && settings[:version_options][:using] == :path
-      namespace_is_empty = namespace && (namespace.to_s =~ /^\s*$/ || namespace.to_s == '/')
-      path_is_empty = path && (path.to_s =~ /^\s*$/ || path.to_s == '/')
-
-      parts << ':version' if uses_path_versioning
-      if ! uses_path_versioning || (! namespace_is_empty || ! path_is_empty)
-        parts << namespace.to_s if namespace
-        parts << path.to_s if path
-        format_suffix = '(.:format)'
-      else
-        format_suffix = '(/.:format)'
-      end
-      parts = parts.flatten.select { |part| part != '/' }
-      Rack::Mount::Utils.normalize_path(parts.join('/') + format_suffix)
+      Path.prepare(path, namespace, settings)
     end
 
     def namespace
@@ -391,8 +381,17 @@ module Grape
       run_filters befores
 
       # Retieve validations from this namespace and all parent namespaces.
+      validation_errors = []
       settings.gather(:validations).each do |validator|
-        validator.validate!(params)
+        begin
+          validator.validate!(params)
+        rescue Grape::Exceptions::Validation => e
+          validation_errors << e
+        end
+      end
+
+      if validation_errors.any?
+        raise Grape::Exceptions::ValidationErrors, errors: validation_errors
       end
 
       run_filters after_validations

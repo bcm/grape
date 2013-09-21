@@ -12,8 +12,8 @@ content negotiation, versioning and much more.
 
 ## Stable Release
 
-You're reading the documentation for the next release of Grape, which should be 0.5.1.
-The current stable release is [0.5.0](https://github.com/intridea/grape/blob/v0.5.0/README.md).
+You're reading the documentation for the next release of Grape, which should be 0.6.1.
+The current stable release is [0.6.0](https://github.com/intridea/grape/blob/v0.6.0/README.md).
 
 ## Project Resources
 
@@ -388,7 +388,7 @@ The `namespace` method has a number of aliases, including: `group`, `resource`,
 class AlphaNumeric < Grape::Validations::Validator
   def validate_param!(attr_name, params)
     unless params[attr_name] =~ /^[[:alnum:]]+$/
-      throw :error, status: 400, message: "#{attr_name}: must consist of alpha-numeric characters"
+      raise Grape::Exceptions::Validation, param: @scope.full_name(attr_name), message: "must consist of alpha-numeric characters"
     end
   end
 end
@@ -406,7 +406,7 @@ You can also create custom classes that take parameters.
 class Length < Grape::Validations::SingleOptionValidator
   def validate_param!(attr_name, params)
     unless params[attr_name].length <= @option
-      throw :error, status: 400, message: "#{attr_name}: must be at the most #{@option} characters long"
+      raise Grape::Exceptions::Validation, param: @scope.full_name(attr_name), message: "must be at the most #{@option} characters long"
     end
   end
 end
@@ -420,23 +420,25 @@ end
 
 ### Validation Errors
 
-When validation and coercion errors occur an exception of type `Grape::Exceptions::Validation` is raised.
+Validation and coercion errors are collected and an exception of type `Grape::Exceptions::ValidationErrors` is raised.
 If the exception goes uncaught it will respond with a status of 400 and an error message.
-You can rescue a `Grape::Exceptions::Validation` and respond with a custom response.
+You can rescue a `Grape::Exceptions::ValidationErrors` and respond with a custom response.
 
 ```ruby
-rescue_from Grape::Exceptions::Validation do |e|
+rescue_from Grape::Exceptions::ValidationErrors do |e|
     Rack::Response.new({
         'status' => e.status,
         'message' => e.message,
-        'param' => e.param
+        'errors' => e.errors
     }.to_json, e.status)
 end
 ```
 
+The validation errors are grouped by parameter name and can be accessed via ``Grape::Exceptions::ValidationErrors#errors``.
+
 ### I18n
 
-Grape supports I18n for parameter-related error messages, but will fallback to English if 
+Grape supports I18n for parameter-related error messages, but will fallback to English if
 translations for the default locale have not been provided. See [en.yml](lib/grape/locale/en.yml) for message keys.
 
 
@@ -646,6 +648,20 @@ instead of a message.
 ```ruby
 error!({ "error" => "unexpected error", "detail" => "missing widget" }, 500)
 ```
+
+### Handling 404
+
+For Grape to handle all the 404s for your API, it can be useful to use a catch-all.
+In its simplest form, it can be like:
+
+```ruby
+route :any, '*path' do
+  error! # or something else
+end
+```
+
+It is very crucial to __define this endpoint at the very end of your API__, as it
+literally accepts every request.
 
 ## Exception Handling
 
@@ -978,7 +994,7 @@ hash may include `:with`, which defines the entity to expose.
 ### Grape Entities
 
 Add the [grape-entity](https://github.com/intridea/grape-entity) gem to your Gemfile.
-Please refer to the [grape-entity documentation](https://github.com/intridea/grape-entity/blob/master/README.markdown)
+Please refer to the [grape-entity documentation](https://github.com/intridea/grape-entity/blob/master/README.md)
 for more details.
 
 The following example exposes statuses.

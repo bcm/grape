@@ -22,8 +22,12 @@ I18n.load_path << File.expand_path('../grape/locale/en.yml', __FILE__)
 module Grape
   autoload :API,                 'grape/api'
   autoload :Endpoint,            'grape/endpoint'
+
   autoload :Route,               'grape/route'
   autoload :Namespace,           'grape/namespace'
+
+  autoload :Path,                'grape/path'
+
   autoload :Cookies,             'grape/cookies'
   autoload :Validations,         'grape/validations'
   autoload :Request,             'grape/http/request'
@@ -31,6 +35,7 @@ module Grape
   module Exceptions
     autoload :Base,                           'grape/exceptions/base'
     autoload :Validation,                     'grape/exceptions/validation'
+    autoload :ValidationErrors,               'grape/exceptions/validation_errors'
     autoload :MissingVendorOption,            'grape/exceptions/missing_vendor_option'
     autoload :MissingMimeType,                'grape/exceptions/missing_mime_type'
     autoload :MissingOption,                  'grape/exceptions/missing_option'
@@ -70,6 +75,7 @@ module Grape
 
     module Auth
       autoload :OAuth2,         'grape/middleware/auth/oauth2'
+      autoload :Base,	          'grape/middleware/auth/base'
       autoload :Basic,          'grape/middleware/auth/basic'
       autoload :Digest,	        'grape/middleware/auth/digest'
     end
