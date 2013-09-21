@@ -36,3 +36,5 @@ tmp
 .rbx
 
 ## PROJECT::SPECIFIC
+.ruby-gemset
+.ruby-version
