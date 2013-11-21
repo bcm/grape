@@ -26,7 +26,7 @@ module Grape
       end
 
       def compile
-        @instance = self.new
+        @instance = new
       end
 
       def change!
@@ -81,12 +81,12 @@ module Grape
       #     version 'v2'
       #
       #     get '/main' do
-      #       {:some => 'data'}
+      #       {some: 'data'}
       #     end
       #
       #     version 'v1' do
       #       get '/main' do
-      #         {:legacy => 'data'}
+      #         {legacy: 'data'}
       #       end
       #     end
       #   end
@@ -95,7 +95,7 @@ module Grape
         if args.any?
           options = args.pop if args.last.is_a? Hash
           options ||= {}
-          options = {:using => :path}.merge!(options)
+          options = { using: :path }.merge(options)
 
           raise Grape::Exceptions::MissingVendorOption.new if options[:using] == :header && !options.has_key?(:vendor)
 
@@ -111,7 +111,7 @@ module Grape
 
       # Add a description to the next namespace or function.
       def desc(description, options = {})
-        @last_description = options.merge(:description => description)
+        @last_description = options.merge(description: description)
       end
 
       # Specify the default format for the API's serializers.
@@ -147,8 +147,13 @@ module Grape
       end
 
       # Specify a default error formatter.
-      def default_error_formatter(new_formatter = nil)
-        new_formatter ? set(:default_error_formatter, new_formatter) : settings[:default_error_formatter]
+      def default_error_formatter(new_formatter_name = nil)
+        if new_formatter_name
+          new_formatter = Grape::ErrorFormatter::Base.formatter_for(new_formatter_name, {})
+          set(:default_error_formatter, new_formatter)
+        else
+          settings[:default_error_formatter]
+        end
       end
 
       def error_formatter(format, options)
@@ -204,9 +209,7 @@ module Grape
         end
 
         options = args.last.is_a?(Hash) ? args.pop : {}
-        if options.has_key?(:with)
-          handler ||= proc { options[:with] }
-        end
+        handler ||= proc { options[:with] } if options.has_key?(:with)
 
         if handler
           args.each do |arg|
@@ -215,8 +218,12 @@ module Grape
         end
 
         imbue(:rescue_options, options)
-        set(:rescue_all, true) and return if args.include?(:all)
-        imbue(:rescued_errors, args)
+
+        if args.include?(:all)
+          set(:rescue_all, true)
+        else
+          imbue(:rescued_errors, args)
+        end
       end
 
       # Allows you to specify a default representation entity for a
@@ -225,10 +232,10 @@ module Grape
       #
       # @example
       #   class ExampleAPI < Grape::API
-      #     represent User, :with => Entity::User
+      #     represent User, with: Entity::User
       #
       #     get '/me' do
-      #       present current_user # :with => Entity::User is assumed
+      #       present current_user # with: Entity::User is assumed
       #     end
       #   end
       #
@@ -271,7 +278,7 @@ module Grape
               include new_mod
             end
           end
-          mod.class_eval &block if block_given?
+          mod.class_eval(&block) if block_given?
           set(:helpers, mod)
         else
           mod = Module.new
@@ -287,7 +294,7 @@ module Grape
       # only `:http_basic`, `:http_digest` and `:oauth2` are supported.
       def auth(type = nil, options = {}, &block)
         if type
-          set(:auth, {:type => type.to_sym, :proc => block}.merge(options))
+          set(:auth, { type: type.to_sym, proc: block }.merge(options))
         else
           settings[:auth]
         end
@@ -313,14 +320,14 @@ module Grape
         mounts.each_pair do |app, path|
           if app.respond_to?(:inherit_settings, true)
             app_settings = settings.clone
-            mount_path = Rack::Mount::Utils.normalize_path([ settings[:mount_path], path ].compact.join("/"))
+            mount_path = Rack::Mount::Utils.normalize_path([settings[:mount_path], path].compact.join("/"))
             app_settings.set :mount_path, mount_path
             app.inherit_settings(app_settings)
           end
           endpoints << Grape::Endpoint.new(settings.clone, {
-            :method => :any,
-            :path => path,
-            :app => app
+            method: :any,
+            path: path,
+            app: app
           })
         end
       end
@@ -334,14 +341,14 @@ module Grape
       # @example Defining a basic route.
       #   class MyAPI < Grape::API
       #     route(:any, '/hello') do
-      #       {:hello => 'world'}
+      #       {hello: 'world'}
       #     end
       #   end
       def route(methods, paths = ['/'], route_options = {}, &block)
         endpoint_options = {
-          :method => methods,
-          :path => paths,
-          :route_options => (@namespace_description || {}).deep_merge(@last_description || {}).deep_merge(route_options || {})
+          method: methods,
+          path: paths,
+          route_options: (@namespace_description || {}).deep_merge(@last_description || {}).deep_merge(route_options || {})
         }
         endpoints << Grape::Endpoint.new(settings.clone, endpoint_options, &block)
 
@@ -361,13 +368,33 @@ module Grape
         imbue(:afters, [block])
       end
 
-      def get(paths = ['/'], options = {}, &block); route('GET', paths, options, &block) end
-      def post(paths = ['/'], options = {}, &block); route('POST', paths, options, &block) end
-      def put(paths = ['/'], options = {}, &block); route('PUT', paths, options, &block) end
-      def head(paths = ['/'], options = {}, &block); route('HEAD', paths, options, &block) end
-      def delete(paths = ['/'], options = {}, &block); route('DELETE', paths, options, &block) end
-      def options(paths = ['/'], options = {}, &block); route('OPTIONS', paths, options, &block) end
-      def patch(paths = ['/'], options = {}, &block); route('PATCH', paths, options, &block) end
+      def get(paths = ['/'], options = {}, &block)
+        route('GET', paths, options, &block)
+      end
+
+      def post(paths = ['/'], options = {}, &block)
+        route('POST', paths, options, &block)
+      end
+
+      def put(paths = ['/'], options = {}, &block)
+        route('PUT', paths, options, &block)
+      end
+
+      def head(paths = ['/'], options = {}, &block)
+        route('HEAD', paths, options, &block)
+      end
+
+      def delete(paths = ['/'], options = {}, &block)
+        route('DELETE', paths, options, &block)
+      end
+
+      def options(paths = ['/'], options = {}, &block)
+        route('OPTIONS', paths, options, &block)
+      end
+
+      def patch(paths = ['/'], options = {}, &block)
+        route('PATCH', paths, options, &block)
+      end
 
       def namespace(space = nil, options = {},  &block)
         if space || block_given?
@@ -422,7 +449,10 @@ module Grape
       # and arguments that are currently applied to the
       # application.
       def middleware
-        settings.stack.inject([]){|a,s| a += s[:middleware] if s[:middleware]; a}
+        settings.stack.inject([]) do |a, s|
+          a += s[:middleware] if s[:middleware]
+          a
+        end
       end
 
       # An array of API routes.
@@ -435,9 +465,11 @@ module Grape
       end
 
       def cascade(value = nil)
-        value.nil? ?
-          (settings.has_key?(:cascade) ? !! settings[:cascade] : true) :
+        if value.nil?
+          settings.has_key?(:cascade) ? !!settings[:cascade] : true
+        else
           set(:cascade, value)
+        end
       end
 
       protected
@@ -454,15 +486,15 @@ module Grape
       # block passed in. Allows for simple 'before' setups
       # of settings stack pushes.
       def nest(*blocks, &block)
-        blocks.reject!{|b| b.nil?}
+        blocks.reject! { |b| b.nil? }
         if blocks.any?
           settings.push  # create a new context to eval the follow
-          instance_eval &block if block_given?
-          blocks.each{|b| instance_eval &b}
-          settings.pop   # when finished, we pop the context
+          instance_eval(&block) if block_given?
+          blocks.each { |b| instance_eval(&b) }
+          settings.pop # when finished, we pop the context
           reset_validations!
         else
-          instance_eval &block
+          instance_eval(&block)
         end
       end
 
@@ -482,17 +514,17 @@ module Grape
 
     def initialize
       @route_set = Rack::Mount::RouteSet.new
+      add_head_not_allowed_methods_and_options_methods
       self.class.endpoints.each do |endpoint|
         endpoint.mount_in(@route_set)
       end
-      add_head_not_allowed_methods
       @route_set.freeze
     end
 
     def call(env)
       status, headers, body = @route_set.call(env)
       headers.delete('X-Cascade') unless cascade?
-      [ status, headers, body ]
+      [status, headers, body]
     end
 
     # Some requests may return a HTTP 404 error if grape cannot find a matching
@@ -504,8 +536,8 @@ module Grape
     # errors from reaching upstream. This is effectivelly done by unsetting
     # X-Cascade. Default :cascade is true.
     def cascade?
-      return !! self.class.settings[:cascade] if self.class.settings.has_key?(:cascade)
-      return !! self.class.settings[:version_options][:cascade] if self.class.settings[:version_options] && self.class.settings[:version_options].has_key?(:cascade)
+      return !!self.class.settings[:cascade] if self.class.settings.has_key?(:cascade)
+      return !!self.class.settings[:version_options][:cascade] if self.class.settings[:version_options] && self.class.settings[:version_options].has_key?(:cascade)
       true
     end
 
@@ -517,35 +549,37 @@ module Grape
     # with a list of HTTP methods that can be called. Also add a route that
     # will return an HTTP 405 response for any HTTP method that the resource
     # cannot handle.
-    def add_head_not_allowed_methods
-      allowed_methods = Hash.new{|h,k| h[k] = [] }
-      resources       = self.class.endpoints.map do |endpoint|
-        endpoint.options[:app] && endpoint.options[:app].respond_to?(:endpoints) ?
-          endpoint.options[:app].endpoints.map(&:routes) :
+    def add_head_not_allowed_methods_and_options_methods
+      allowed_methods = Hash.new { |h, k| h[k] = [] }
+      resources = self.class.endpoints.map do |endpoint|
+        if endpoint.options[:app] && endpoint.options[:app].respond_to?(:endpoints)
+          endpoint.options[:app].endpoints.map(&:routes)
+        else
           endpoint.routes
+        end
       end
       resources.flatten.each do |route|
-        allowed_methods[route.route_compiled] << route.route_method
+        allowed_methods[route.route_path] << route.route_method
       end
-      allowed_methods.each do |path_info, methods|
-        if methods.include?('GET') && ! methods.include?("HEAD") && ! self.class.settings[:do_not_route_head]
-          methods = methods | [ 'HEAD' ]
+      allowed_methods.each do |path, methods|
+        if methods.include?('GET') && !methods.include?('HEAD') && !self.class.settings[:do_not_route_head]
+          methods = methods | ['HEAD']
         end
-        allow_header = (["OPTIONS"] | methods).join(", ")
-        unless methods.include?("OPTIONS") || self.class.settings[:do_not_route_options]
-          @route_set.add_route( proc { [204, { 'Allow' => allow_header }, []]}, {
-            :path_info      => path_info,
-            :request_method => "OPTIONS"
-          })
+        allow_header = (['OPTIONS'] | methods).join(', ')
+        if methods.include?('OPTIONS') || !self.class.settings[:do_not_route_options]
+          self.class.options(path, {}) {
+            header 'Allow', allow_header
+            status 204
+            ''
+          }
         end
         not_allowed_methods = %w(GET PUT POST DELETE PATCH HEAD) - methods
-        not_allowed_methods << "OPTIONS" if self.class.settings[:do_not_route_options]
-        not_allowed_methods.each do |bad_method|
-          @route_set.add_route( proc { [405, { 'Allow' => allow_header, 'Content-Type' => 'text/plain' }, []]}, {
-            :path_info      => path_info,
-            :request_method => bad_method
-          })
-        end
+        not_allowed_methods << 'OPTIONS' if self.class.settings[:do_not_route_options]
+        self.class.route(not_allowed_methods, path) {
+          header 'Allow', allow_header
+          status 405
+          ''
+        }
       end
     end
 

@@ -1,7 +1,7 @@
 module Grape
 
   class API
-    Boolean = Virtus::Attribute::Boolean
+    Boolean = Virtus::Attribute::Boolean # rubocop:disable ConstantName
   end
 
   module Validations
@@ -12,12 +12,13 @@ module Grape
         if valid_type?(new_value)
           params[attr_name] = new_value
         else
-          raise Grape::Exceptions::Validation, :param => @scope.full_name(attr_name), :message_key => :coerce
+          raise Grape::Exceptions::Validation, param: @scope.full_name(attr_name), message_key: :coerce
         end
       end
 
       class InvalidValue; end
-    private
+
+      private
 
       def _valid_array_type?(type, values)
         values.all? do |val|
@@ -46,11 +47,11 @@ module Grape
       end
 
       def coerce_value(type, val)
-        converter = Virtus::Attribute.build(:a, type)
+        converter = Virtus::Attribute.build(type)
         converter.coerce(val)
 
       # not the prettiest but some invalid coercion can currently trigger
-      # errors in Virtus (see coerce_spec.rb)
+      # errors in Virtus (see coerce_spec.rb:75)
       rescue
         InvalidValue.new
       end

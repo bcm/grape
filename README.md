@@ -12,8 +12,8 @@ content negotiation, versioning and much more.
 
 ## Stable Release
 
-You're reading the documentation for the next release of Grape, which should be 0.6.1.
-The current stable release is [0.6.0](https://github.com/intridea/grape/blob/v0.6.0/README.md).
+You're reading the documentation for the next release of Grape, which should be 0.6.2.
+The current stable release is [0.6.1](https://github.com/intridea/grape/blob/v0.6.1/README.md).
 
 ## Project Resources
 
@@ -290,7 +290,7 @@ get :public_timeline do
 end
 ```
 
-Parameters are automatically populated from the request body on POST and PUT for form input, JSON and
+Parameters are automatically populated from the request body on `POST` and `PUT` for form input, JSON and
 XML content-types.
 
 The request:
@@ -323,6 +323,14 @@ post "upload" do
 end
 ```
 
+In the case of conflict between either of:
+
+* route string parameters
+* `GET`, `POST` and `PUT` parameters
+* the contents of the request body on `POST` and `PUT`
+
+route string parameters will have precedence.
+
 ## Parameter Validation and Coercion
 
 You can define validations and coercion options for your parameters using a `params` block.
@@ -335,7 +343,7 @@ params do
     requires :url
   end
   optional :audio do
-    requires :mp3
+    requires :format, type: Symbol, values: [:mp3, :wav, :aac, :ogg], default: :mp3
   end
 end
 put ':id' do
@@ -351,6 +359,20 @@ Optional parameters can have a default value.
 ```ruby
 params do
   optional :color, type: String, default: 'blue'
+  optional :random_number, type: Integer, default: -> { Random.rand(1..100) }
+  optional :non_random_number, type: Integer, default:  Random.rand(1..100) 
+end
+```
+
+Parameters can be restricted to a specific set of values with the `:values` option.
+
+Default values are eagerly evaluated. Above `:non_random_number` will evaluate to the same
+number for each call to the endpoint of this `params` block. To have the default evaluate 
+at calltime use a lambda, like `:random_number` above.
+
+```ruby
+params do
+  requires :status, type: Symbol, values: [:not_started, :processing, :done]
 end
 ```
 
@@ -381,6 +403,23 @@ end
 
 The `namespace` method has a number of aliases, including: `group`, `resource`,
 `resources`, and `segment`. Use whichever reads the best for your API.
+
+You can conveniently define a route parameter as a namespace using `route_param`.
+
+```ruby
+namespace :statuses do
+  route_param :id do
+    desc "Returns all replies for a status."
+    get 'replies' do
+      Status.find(params[:id]).replies
+    end
+    desc "Returns a status."
+    get do
+      Status.find(params[:id])
+    end
+  end
+end
+```
 
 ### Custom Validators
 
@@ -897,7 +936,7 @@ The order for choosing the format is the following.
 
 ### JSONP
 
-Grape suports JSONP via [Rack::JSONP](https://github.com/rack/rack-contrib), part of the
+Grape supports JSONP via [Rack::JSONP](https://github.com/rack/rack-contrib), part of the
 [rack-contrib](https://github.com/rack/rack-contrib) gem. Add `rack-contrib` to your `Gemfile`.
 
 ```ruby
@@ -1007,7 +1046,7 @@ module API
       expose :user_name
       expose :text, documentation: { type: "string", desc: "Status update text." }
       expose :ip, if: { type: :full }
-      expose :user_type, user_id, if: lambda{ |status, options| status.user.public? }
+      expose :user_type, user_id, if: lambda { |status, options| status.user.public? }
       expose :digest { |status, options| Digest::MD5.hexdigest(status.txt) }
       expose :replies, using: API::Status, as: :replies
     end
@@ -1055,7 +1094,7 @@ classes underneath the model they represent.
 ```ruby
 class Status
   def entity
-    Status.new(self)
+    Entity.new(self)
   end
 
   class Entity < Grape::Entity
@@ -1165,6 +1204,38 @@ before do
   header "X-Robots-Tag", "noindex"
 end
 ```
+
+The block applies to every API call within and below the current namespace:
+
+```ruby
+class MyAPI < Grape::API
+  get '/' do
+    "root - #{@blah}"
+  end
+
+  namespace :foo do
+    before { @blah = 'blah' }
+    get '/' do
+      "root - foo - #{@blah}"
+    end
+
+    namespace :bar do
+      get '/' do
+        "root - foo - bar - #{@blah}"
+      end
+    end
+  end
+end
+```
+
+The behaviour is then:
+
+```bash
+GET /           # 'root - '
+GET /foo        # 'root - foo - blah'
+GET /foo/bar    # 'root - foo - bar - blah'
+```
+
 
 ## Anchoring
 

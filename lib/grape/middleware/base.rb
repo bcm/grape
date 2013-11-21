@@ -34,7 +34,7 @@ module Grape
       def after; end
 
       def request
-        Grape::Request.new(self.env)
+        Grape::Request.new(env)
       end
 
       def response
@@ -54,7 +54,9 @@ module Grape
       end
 
       def mime_types
-        content_types.invert
+        content_types.each_with_object({}) { |(k, v), types_without_params|
+          types_without_params[k] = v.split(';').first
+        }.invert
       end
 
     end

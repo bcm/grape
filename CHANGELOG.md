@@ -2,9 +2,35 @@ Next Release
 ============
 
 #### Features
+* [#510](https://github.com/intridea/grape/pull/510): Support lambda-based default values for params - [@myitcv](https://github.com/myitcv).
+* Your contribution here.
+
+#### Fixes
+
+* [#508](https://github.com/intridea/grape/pull/508): Allow parameters, such as content encoding, in `content_type` - [@dm1try](https://github.com/dm1try).
+* [#492](https://github.com/intridea/grape/pull/492): Don't allow to have nil value when a param is required and has a list of allowed values - [@Antti](https://github.com/Antti).
+* [#495](https://github.com/intridea/grape/pull/495): Fix `ParamsScope#params` for parameters nested inside arrays - [@asross](https://github.com/asross).
+* [#498](https://github.com/intridea/grape/pull/498): Dry up options and headers logic, allow headers to be passed to OPTIONS requests - [@karlfreeman](https://github.com/karlfreeman).
+* [#500](https://github.com/intridea/grape/pull/500): Skip entity auto-detection when explicitely passed - [@yaneq](https://github.com/yaneq).
+* Your contribution here.
+
+
+0.6.1
+=====
+
+#### Features
 
 * [#475](https://github.com/intridea/grape/pull/475): Added support for the `:jsonapi`, `application/vnd.api+json` media type registered at http://jsonapi.org - [@bcm](https://github.com/bcm).
-* Your contribution here.
+* [#471](https://github.com/intridea/grape/issues/471): Added parameter validator for a list of allowed values - [@vickychijwani](https://github.com/vickychijwani).
+* [#488](https://github.com/intridea/grape/issues/488): Upgraded to Virtus 1.0 - [@dblock](https://github.com/dblock).
+
+#### Fixes
+
+* [#477](https://github.com/intridea/grape/pull/477): Fixed `default_error_formatter` which takes a format symbol - [@vad4msiu](https://github.com/vad4msiu).
+
+#### Development
+
+* Implemented Rubocop, a Ruby code static code analyzer - [@dblock](https://github.com/dblock).
 
 0.6.0 (9/16/2013)
 =================

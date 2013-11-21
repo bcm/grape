@@ -45,14 +45,14 @@ module Grape
         end
       end
 
-    private
+      private
 
       def self.convert_to_short_name(klass)
-        ret = klass.name.gsub(/::/, '/').
-          gsub(/([A-Z]+)([A-Z][a-z])/,'\1_\2').
-          gsub(/([a-z\d])([A-Z])/,'\1_\2').
-          tr("-", "_").
-          downcase
+        ret = klass.name.gsub(/::/, '/')
+          .gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
+          .gsub(/([a-z\d])([A-Z])/, '\1_\2')
+          .tr("-", "_")
+          .downcase
         File.basename(ret, '_validator')
       end
     end
@@ -72,7 +72,7 @@ module Grape
     class Validator
       def self.inherited(klass)
         short_name = convert_to_short_name(klass)
-        Validations::register_validator(short_name, klass)
+        Validations.register_validator(short_name, klass)
       end
     end
 
@@ -102,7 +102,7 @@ module Grape
       end
 
       def should_validate?(parameters)
-        return false if @optional && params(parameters).blank?
+        return false if @optional && params(parameters).all?(&:blank?)
         return true if parent.nil?
         parent.should_validate?(parameters)
       end
@@ -110,10 +110,8 @@ module Grape
       def requires(*attrs, &block)
         return new_scope(attrs, &block) if block_given?
 
-        validations = {:presence => true}
-        if attrs.last.is_a?(Hash)
-          validations.merge!(attrs.pop)
-        end
+        validations = { presence: true }
+        validations.merge!(attrs.pop) if attrs.last.is_a?(Hash)
 
         push_declared_params(attrs)
         validates(attrs, validations)
@@ -123,9 +121,7 @@ module Grape
         return new_scope(attrs, true, &block) if block_given?
 
         validations = {}
-        if attrs.last.is_a?(Hash)
-          validations.merge!(attrs.pop)
-        end
+        validations.merge!(attrs.pop) if attrs.last.is_a?(Hash)
 
         push_declared_params(attrs)
         validates(attrs, validations)
@@ -137,7 +133,13 @@ module Grape
 
       def params(params)
         params = @parent.params(params) if @parent
-        params = params[@element] || {} if @element
+        if @element
+          if params.is_a?(Array)
+            params = params.map { |el| el[@element] || {} }
+          else
+            params = params[@element] || {}
+          end
+        end
         params
       end
 
@@ -146,15 +148,15 @@ module Grape
         name.to_s
       end
 
-    protected
+      protected
 
       def push_declared_params(attrs)
         @declared_params.concat attrs
       end
 
-    private
+      private
 
-      def new_scope(attrs, optional=false, &block)
+      def new_scope(attrs, optional = false, &block)
         raise ArgumentError unless attrs.size == 1
         ParamsScope.new(api: @api, element: attrs.first, parent: self, optional: optional, &block)
       end
@@ -170,26 +172,34 @@ module Grape
       end
 
       def validates(attrs, validations)
-        doc_attrs = { :required => validations.keys.include?(:presence) }
+        doc_attrs = { required: validations.keys.include?(:presence) }
 
         # special case (type = coerce)
-        if validations[:type]
-          validations[:coerce] = validations.delete(:type)
+        validations[:coerce] = validations.delete(:type) if validations.key?(:type)
+
+        coerce_type = validations[:coerce]
+        doc_attrs[:type] = coerce_type.to_s if coerce_type
+
+        desc = validations.delete(:desc)
+        doc_attrs[:desc] = desc if desc
+
+        default = validations[:default]
+        doc_attrs[:default] = default if default
+
+        values = validations[:values]
+        doc_attrs[:values] = values if values
+
+        # default value should be present in values array, if both exist
+        if default && values && !values.include?(default)
+          raise Grape::Exceptions::IncompatibleOptionValues.new(:default, default, :values, values)
         end
 
-        if coerce_type = validations[:coerce]
-          doc_attrs[:type] = coerce_type.to_s
+        # type should be compatible with values array, if both exist
+        if coerce_type && values && values.any? { |v| !v.instance_of?(coerce_type) }
+          raise Grape::Exceptions::IncompatibleOptionValues.new(:type, coerce_type, :values, values)
         end
 
-        if desc = validations.delete(:desc)
-          doc_attrs[:desc] = desc
-        end
-
-        if default = validations[:default]
-          doc_attrs[:default] = default
-        end
-
-        full_attrs = attrs.collect{ |name| { :name => name, :full_name => full_name(name)} }
+        full_attrs = attrs.collect { |name| { name: name, full_name: full_name(name) } }
         @api.document_attribute(full_attrs, doc_attrs)
 
         # Validate for presence before any other validators
@@ -212,7 +222,7 @@ module Grape
       end
 
       def validate(type, options, attrs, doc_attrs)
-        validator_class = Validations::validators[type.to_s]
+        validator_class = Validations.validators[type.to_s]
 
         if validator_class
           (@api.settings.peek[:validations] ||= []) << validator_class.new(attrs, options, doc_attrs[:required], self)
